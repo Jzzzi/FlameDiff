@@ -79,7 +79,6 @@ class ViTDecoder(nn.Module):
         x = x + self.pos_embed + t_emb
 
         # Transformer Encoder
-        breakpoint()
         x = self.transformer_encoder(x)  # (B, 48 + 1, d_model)
 
         # Remove feature token
