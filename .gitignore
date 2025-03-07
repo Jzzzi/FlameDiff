@@ -1,0 +1,8 @@
+/__pycache__/*
+/dataset/*
+/exp/*
+/outputs/*
+**/__pycache__/*
+/debug/*
+/dataset
+/outputs
