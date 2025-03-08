@@ -48,10 +48,30 @@ class FlameAgent(pl.LightningModule):
         pred_noise = self.vitdecoder(noisy_img, feature, timesteps.float())
 
         loss = F.mse_loss(pred_noise, noise)
-        self.log('train_loss', loss, prog_bar = True, logger=True, on_step=True, on_epoch=True, sync_dist=True)
+        if self.training:
+            self.log('train_loss', loss, prog_bar = True, logger=True, on_step=True, on_epoch=True, sync_dist=True)
+        else:
+            self.log('val_loss', loss, prog_bar = True, logger=True, on_step=True, on_epoch=True, sync_dist=True)
         return loss
     
     def configure_optimizers(self):
         return torch.optim.Adam(self.vitdecoder.parameters(), lr=1e-4)
         
+    def configure_callbacks(self):
+        from pytorch_lightning.callbacks import ModelCheckpoint
+        checkpoint_callback_1 = ModelCheckpoint(
+            monitor='val_loss',
+            filename='flame-{epoch:02d}-{val_loss:.2f}',
+            save_top_k=3,
+            mode='min',
+            every_n_epochs=100
+        )
+        checkpoint_callback_2 = ModelCheckpoint(
+            monitor='train_loss',
+            filename='flame-{epoch:02d}-{val_loss:.2f}',
+            save_top_k=-1,
+            mode='min',
+            every_n_epochs=50
+        )
+        return [checkpoint_callback_1, checkpoint_callback_2]
         

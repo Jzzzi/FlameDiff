@@ -22,7 +22,8 @@ def main(cfg: DictConfig):
     train_data_loader = DataLoader(train_dataset, **cfg.dataloader)
     val_data_loader = DataLoader(val_dataset, **cfg.dataloader)
     agent = FlameAgent(endecoder_ckpt=cfg.endecoder_ckpt)
-    devices=[0, 2, 3, 4, 5, 6, 7]
+    # devices=[0, 2, 3, 4, 5, 6, 7]
+    devices=[0, 1, 2, 3, 4, 5, 6, 7]
     # devices = [0]
     trainer = pl.Trainer(**cfg.trainer, devices=devices, logger=TensorBoardLogger(cfg.log_dir, name=cfg.exp_name), default_root_dir=cfg.log_dir)
     trainer.fit(agent,
