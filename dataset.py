@@ -28,8 +28,11 @@ class FlameDiffDataset(Dataset):
                         self._data = data
                     else:
                         self._data = np.concatenate((self._data, data), axis=0)
-        print(f'Data loaded. Shape: {self._data.shape}')           
+        print(f'Data loaded. Shape: {self._data.shape}. Min: {self._data.min()}. Max: {self._data.max()}')           
 
+    def max_min(self):
+        return self._data.max(), self._data.min()
+    
     def __len__(self):
         return self._data.shape[0]
 

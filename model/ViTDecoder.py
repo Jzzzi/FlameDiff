@@ -11,81 +11,121 @@ def timestep_embedding(timesteps, dim):
     return emb 
 
 class ViTDecoder(nn.Module):
-    def __init__(self, d_model=256, img_size=(24, 32), patch_size=7, num_heads=8, num_layers=6):
+    def __init__(self, d_model=256, img_size=(48, 64), num_heads=8, num_layers=8):
+        """
+        Enhanced Vision Transformer Decoder with U-Net style skip connections.
+        
+        Args:
+            d_model: Feature dimension.
+            img_size: Tuple representing input image size.
+            num_heads: Number of attention heads in the Transformer.
+            num_layers: Number of Transformer encoder layers.
+        """
         super().__init__()
         self.d_model = d_model
-        self.num_patches = 6 * 8
-
-        # Patch embedding
-        # self.patch_embed = nn.Conv2d(1, d_model, kernel_size=patch_size, stride=patch_size) # (B, 1, 45, 61) -> (B, d_model, 6, 8)
-        self.patch_embed = nn.Sequential(
-            nn.Conv2d(1, d_model//2, kernel_size=3, stride=2),  # (B, 1, 45, 61) -> (B, d_model, 22, 30)
-            nn.ReLU(),
-            nn.LayerNorm([d_model//2, 22, 30]),
-            nn.Conv2d(d_model//2, d_model, kernel_size=3, stride=2),  # (B, d_model, 22, 30) -> (B, d_model, 10, 14)
+        
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(1, d_model//4, kernel_size=3, stride=1, padding=1),  # (B, 1, 48, 64) -> (B, d_model//4, 48, 64)
+            nn.SiLU(),
+            nn.Conv2d(d_model//4, d_model//2, kernel_size=5, stride=1, padding=2),  # (B, d_model//4, 48, 64) -> (B, d_model//2, 48, 64)
+            nn.SiLU(),
         )
 
-        # Feature embedding
-        self.feat_embed = nn.Sequential(
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(d_model//2, d_model//2, kernel_size=3, stride=2, padding=1),  # (B, d_model//2, 48, 64) -> (B, d_model//2, 24, 32)
+            nn.SiLU(),
+            nn.Conv2d(d_model//2, d_model, kernel_size=5, stride=1, padding=2),  # (B, d_model//2, 24, 32) -> (B, d_model, 24, 32)
+            nn.SiLU()
+        )
+        
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(d_model, d_model, kernel_size=3, stride=2, padding=1),  # (B, d_model//2, 24, 32) -> (B, d_model, 24, 32)
+            nn.SiLU(),
+            nn.Conv2d(d_model, d_model, kernel_size=5, stride=1, padding=2),  # (B, d_model, 12, 16) -> (B, d_model, 12, 16)
+            nn.SiLU()
+        )
+        
+        # interpolate to 24, 32
+        self.conv4 = nn.Sequential(
+            nn.Conv2d(d_model, d_model//2, kernel_size=3, stride=1, padding=1),  # (B, d_model, 24, 32) -> (B, d_model//2, 24, 32)
+            nn.SiLU(),
+            nn.Conv2d(d_model//2, d_model//2, kernel_size=5, stride=1, padding=2),  # (B, d_model//2, 24, 32) -> (B, d_model//2, 24, 32)
+            nn.SiLU()
+        )
+        # interpolate to 48, 64
+        self.conv5 = nn.Sequential(
+            nn.Conv2d(d_model//2, d_model//4, kernel_size=3, stride=1, padding=1),  # (B, d_model//2, 48, 64) -> (B, d_model//4, 48, 64)
+            nn.SiLU(),
+            nn.Conv2d(d_model//4, 1, kernel_size=5, stride=1, padding=2),  # (B, d_model//4, 48, 64) -> (B, 1, 48, 64)
+            # nn.Tanh()
+        )
+        
+        
+        # Transformer encoder: Process the flattened low-resolution feature map.
+        self.transformer_encoder = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(d_model=d_model, nhead=num_heads, 
+                                       dim_feedforward=d_model*4, dropout=0.1, activation='gelu', batch_first=True),
+            num_layers=num_layers
+        )
+        
+        # Position embedding for transformer tokens (conv3 flattened tokens + 2 extra tokens)
+        self.num_tokens = 12 * 16  # Assuming conv3 output spatial size is approximately 12x16.
+        self.pos_embed = nn.Parameter(torch.randn(1, self.num_tokens, d_model) * 0.02)
+        
+        self.time_mlp = nn.Sequential(
+            nn.Linear(d_model, d_model),
+            nn.SiLU(),
+            nn.Linear(d_model, d_model),
+        )
+        
+        self.feat_mlp = nn.Sequential(
             nn.Linear(12, d_model),
-            nn.ReLU(),
-            nn.Linear(d_model, d_model)
+            nn.SiLU(),
+            nn.Linear(d_model, d_model),
         )
 
-        # Position embedding
-        self.pos_embed = nn.Parameter(torch.randn(1, 10 * 14 + 1, d_model)) # (1, 10 * 15 + 1, d_model), 1 for feature token
-
-        # Transformer Encoder
-        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=num_heads, batch_first=True)
-
-        self.transformer_encoder = nn.Sequential(
-            nn.LayerNorm(d_model),
-            nn.TransformerEncoder(encoder_layer, num_layers=num_layers),
-            nn.LayerNorm(d_model)
-        )
-
-
-        # Upsampling from patch-level to full image (6x8 -> 45x61)
-        self.upsample = nn.Sequential(
-            nn.ConvTranspose2d(d_model, 128, kernel_size=3, stride=2),
-            nn.BatchNorm2d(128),
-            nn.ReLU(),
-            nn.ConvTranspose2d(128, 1, kernel_size=3, stride=2),
-        )
-
+    
     def forward(self, x: torch.Tensor, f: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
-        '''
+        """
+        Forward pass for EnhancedViTDecoder.
+        
         Args:
-            x: torch.Tensor, input image, (B, 1, 45, 61)
-            f: torch.Tensor, feature, (B, 12)
-            t: torch.Tensor, time, (B, 1)
+            x: Input image tensor of shape (B, 1, 48, 64). [-1, 1]
+            f: Feature vector tensor of shape (B, 12). 
+            t: Time tensor of shape (B, 1).
+        
         Returns:
-            noise_map: torch.Tensor, predicted noise map, (B, 1, 45, 61)
-        '''
+            noise_map: Predicted noise map of shape (B, 1, 45, 61).
+        """
         B = x.shape[0]
+        
+        feat1 = self.conv1(x)# (B, 1, 48, 64) -> (B, d_model//2, 48, 64)  
+        feat2 = self.conv2(feat1)   # (B, d_model//4, 48, 64) -> (B, d_model, 24, 32)
+        feat3 = self.conv3(feat2)   # (B, d_model, 24, 32) -> (B, d_model, 12, 16)
+        
+        B, C, H, W = feat3.shape
+        feat3_flat = feat3.flatten(2).transpose(1, 2)  
 
-        # Patch embedding
-        x = self.patch_embed(x) # (B, 1, 45, 61) -> (B, d_model, 9, 13)
-        x = x.permute(0, 2, 3, 1).reshape(B, 10 * 14, self.d_model).contiguous() # (B, d_model, 10, 15) -> (B, 10, 15, d_model) -> (B, 150, d_model)
+        t_embed = timestep_embedding(t, self.d_model)
+        t_embed = self.time_mlp(t_embed).unsqueeze(1) # (B, 1, d_model)
+          
+        f_embed = self.feat_mlp(f).unsqueeze(1) # (B, 12) -> (B, 1, d_model)
 
-        # Time & Feature embeddings
-        t_emb = timestep_embedding(t, self.d_model).to(x.device).unsqueeze(1) # (B, 1, d_model)
-        f_emb = self.feat_embed(f).unsqueeze(1) # (B, 1, d_model)
+        tokens = feat3_flat # (B, 12*16, d_model)
+        tokens = tokens + self.pos_embed + t_embed + f_embed
+        tokens = self.transformer_encoder(tokens)  
 
-        # Concatenate
-        x = torch.cat([x, f_emb], dim=1) # (B, 150 + 1, d_model)
+        tokens = tokens[:, :H * W, :]  
 
-        # Add positional embedding
-        x = x + self.pos_embed + t_emb
-
-        # Transformer Encoder
-        x = self.transformer_encoder(x)  # (B, 150 + 1, d_model)
-
-        # Remove feature token
-        x = x[:, 0:-1, :].permute(0, 2, 1).reshape(B, self.d_model, 10, 14).contiguous()
-
-        # Upsampling to full resolution
-        x = self.upsample(x)  # (B, 1, 6, 8) -> (B, 1, 45, 61)
-        x = F.interpolate(x, size=(45, 61), mode='bilinear', align_corners=False)  # (B, 1, 6, 8) -> (B, 1, 45, 61)
-
-        return x
+        feat3_enhanced = tokens.transpose(1, 2).reshape(B, C, H, W)  # (B, d_model, 12, 16)
+        feat3_enhanced += feat3 # skip connection
+        
+        feat3_enhanced = F.interpolate(feat3_enhanced, scale_factor=2) # (B, d_model, 12, 16) -> (B, d_model, 24, 32)
+        feat3_enhanced += feat2 # skip connection
+        up1 = self.conv4(feat3_enhanced)# (B, d_model, 24, 32) -> (B, d_model//2, 24, 32)
+        up2 = F.interpolate(up1, scale_factor=2) # (B, d_model//2, 24, 32) -> (B, d_model//2, 48, 64)      
+        up2 += feat1 # skip connection
+        
+        noise_map = self.conv5(up2) # (B, d_model//4, 48, 64) -> (B, 1, 48, 64)
+        
+        return noise_map
