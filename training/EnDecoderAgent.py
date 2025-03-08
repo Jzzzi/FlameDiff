@@ -41,5 +41,14 @@ class AutoEncoderAgent(pl.LightningModule):
     
     def configure_optimizers(self):
         return torch.optim.Adam(self._model.parameters(), lr=1e-4)
+    
+    def configure_callbacks(self):
+        from pytorch_lightning.callbacks import ModelCheckpoint
+        checkpoint_callback = ModelCheckpoint(
+            filename='autoencoder-{epoch:02d}-{val_loss:.2f}',
+            save_top_k=-1,
+            every_n_epochs=20
+        )
+        return [checkpoint_callback]
         
         

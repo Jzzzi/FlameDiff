@@ -2,10 +2,11 @@ cache_path: /data15/jinkun.liu.2502/CodeSpace/FlameDiff/dataset
 exp_name: vit
 log_dir: /data15/jinkun.liu.2502/CodeSpace/FlameDiff/exp/${exp_name}/${now:%Y-%m-%d-%H-%M-%S}
 endecoder_ckpt: /data15/jinkun.liu.2502/CodeSpace/FlameDiff/weights/EnDecoder_new.ckpt
+ckpt_path: /data15/jinkun.liu.2502/CodeSpace/FlameDiff/weights/FlameAgent.ckpt
 seed: 0
 
 trainer:
-  max_epochs: 10000
+  max_epochs: 1000
   check_val_every_n_epoch: 50
   log_every_n_steps: 1
   strategy: ddp
