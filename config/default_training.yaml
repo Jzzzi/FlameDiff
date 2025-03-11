@@ -5,8 +5,16 @@ endecoder_ckpt: /data15/jinkun.liu.2502/CodeSpace/FlameDiff/weights/EnDecoder_ne
 ckpt_path: /data15/jinkun.liu.2502/CodeSpace/FlameDiff/exp/vit/2025-03-08-22-48-29/vit/version_0/checkpoints/flame-epoch=999-val_loss=0.01.ckpt
 seed: 0
 
+sensors: [[20, 95], [70, 95], [110, 80], [110, 110], [160, 75], [160, 120], [200, 75], [200, 120]]
+
+flame_agent:
+  params:
+    endecoder_ckpt: ${endecoder_ckpt}
+    sensors: ${sensors}
+    # ckpt_path: ${ckpt_path}
+    
 trainer:
-  max_epochs: 1000
+  max_epochs: 2000
   check_val_every_n_epoch: 50
   log_every_n_steps: 1
   strategy: ddp

@@ -27,6 +27,8 @@ class ViTDecoder(nn.Module):
         self.conv1 = nn.Sequential(
             nn.Conv2d(1, d_model//4, kernel_size=3, stride=1, padding=1),  # (B, 1, 48, 64) -> (B, d_model//4, 48, 64)
             nn.SiLU(),
+            nn.Conv2d(d_model//4, d_model//4, kernel_size=5, stride=1, padding=2),  # (B, d_model//4, 48, 64) -> (B, d_model//4, 48, 64)
+            nn.SiLU(),
             nn.Conv2d(d_model//4, d_model//2, kernel_size=5, stride=1, padding=2),  # (B, d_model//4, 48, 64) -> (B, d_model//2, 48, 64)
             nn.SiLU(),
         )
@@ -34,12 +36,16 @@ class ViTDecoder(nn.Module):
         self.conv2 = nn.Sequential(
             nn.Conv2d(d_model//2, d_model//2, kernel_size=3, stride=2, padding=1),  # (B, d_model//2, 48, 64) -> (B, d_model//2, 24, 32)
             nn.SiLU(),
+            nn.Conv2d(d_model//2, d_model//2, kernel_size=5, stride=1, padding=2),  # (B, d_model//2, 24, 32) -> (B, d_model//2, 24, 32)
+            nn.SiLU(),
             nn.Conv2d(d_model//2, d_model, kernel_size=5, stride=1, padding=2),  # (B, d_model//2, 24, 32) -> (B, d_model, 24, 32)
             nn.SiLU()
         )
         
         self.conv3 = nn.Sequential(
             nn.Conv2d(d_model, d_model, kernel_size=3, stride=2, padding=1),  # (B, d_model//2, 24, 32) -> (B, d_model, 24, 32)
+            nn.SiLU(),
+            nn.Conv2d(d_model, d_model, kernel_size=5, stride=1, padding=2),  # (B, d_model, 24, 32) -> (B, d_model, 12, 16)
             nn.SiLU(),
             nn.Conv2d(d_model, d_model, kernel_size=5, stride=1, padding=2),  # (B, d_model, 12, 16) -> (B, d_model, 12, 16)
             nn.SiLU()
@@ -50,11 +56,15 @@ class ViTDecoder(nn.Module):
             nn.Conv2d(d_model, d_model//2, kernel_size=3, stride=1, padding=1),  # (B, d_model, 24, 32) -> (B, d_model//2, 24, 32)
             nn.SiLU(),
             nn.Conv2d(d_model//2, d_model//2, kernel_size=5, stride=1, padding=2),  # (B, d_model//2, 24, 32) -> (B, d_model//2, 24, 32)
+            nn.SiLU(),
+            nn.Conv2d(d_model//2, d_model//2, kernel_size=5, stride=1, padding=2),  # (B, d_model//2, 24, 32) -> (B, d_model//2, 24, 32)
             nn.SiLU()
         )
         # interpolate to 48, 64
         self.conv5 = nn.Sequential(
-            nn.Conv2d(d_model//2, d_model//4, kernel_size=3, stride=1, padding=1),  # (B, d_model//2, 48, 64) -> (B, d_model//4, 48, 64)
+            nn.Conv2d(d_model//2, d_model//2, kernel_size=3, stride=1, padding=1),  # (B, d_model//2, 48, 64) -> (B, d_model//4, 48, 64)
+            nn.SiLU(),
+            nn.Conv2d(d_model//2, d_model//4, kernel_size=5, stride=1, padding=2),  # (B, d_model//4, 48, 64) -> (B, d_model//4, 48, 64)
             nn.SiLU(),
             nn.Conv2d(d_model//4, 1, kernel_size=5, stride=1, padding=2),  # (B, d_model//4, 48, 64) -> (B, 1, 48, 64)
             # nn.Tanh()
@@ -79,7 +89,7 @@ class ViTDecoder(nn.Module):
         )
         
         self.feat_mlp = nn.Sequential(
-            nn.Linear(12, d_model),
+            nn.Linear(8, d_model),
             nn.SiLU(),
             nn.Linear(d_model, d_model),
         )
@@ -109,7 +119,7 @@ class ViTDecoder(nn.Module):
         t_embed = timestep_embedding(t, self.d_model)
         t_embed = self.time_mlp(t_embed).unsqueeze(1) # (B, 1, d_model)
           
-        f_embed = self.feat_mlp(f).unsqueeze(1) # (B, 12) -> (B, 1, d_model)
+        f_embed = self.feat_mlp(f).unsqueeze(1) # (B, 8) -> (B, 1, d_model)
 
         tokens = feat3_flat # (B, 12*16, d_model)
         tokens = tokens + self.pos_embed + t_embed + f_embed

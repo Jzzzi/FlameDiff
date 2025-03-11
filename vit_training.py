@@ -23,13 +23,10 @@ def main(cfg: DictConfig):
     train_data_loader = DataLoader(train_dataset, **cfg.dataloader)
     val_data_loader = DataLoader(val_dataset, **cfg.dataloader)
     max_v, min_v = dataset.max_min()
-    agent = FlameAgent.load_from_checkpoint(cfg.ckpt_path)
-    agent.autoendecoder.load_state_dict(torch.load(cfg.endecoder_ckpt))
-    agent.autoendecoder.eval()
-    agent.autoendecoder.requires_grad_(False)
+    agent = FlameAgent(**cfg.flame_agent.params)
     agent.max_v = max_v
     agent.min_v = min_v
-    devices=[0, 1, 2, 3, 4, 5, 6, 7]
+    devices=[0, 1, 2, 3, 4, 5, 6, ]
     # devices = [0]
     trainer = pl.Trainer(**cfg.trainer, devices=devices, logger=TensorBoardLogger(cfg.log_dir, name=cfg.exp_name), default_root_dir=cfg.log_dir,)
     trainer.fit(agent,
