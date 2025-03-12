@@ -80,16 +80,23 @@ class ViTDecoder(nn.Module):
         
         # Position embedding for transformer tokens (conv3 flattened tokens + 2 extra tokens)
         self.num_tokens = 12 * 16  # Assuming conv3 output spatial size is approximately 12x16.
-        self.pos_embed = nn.Parameter(torch.randn(1, self.num_tokens, d_model) * 0.02)
+        self.num_feats = 8
+        self.pos_embed = nn.Parameter(torch.randn(1, self.num_tokens + self.num_feats, d_model) * 0.02) # 
         
-        self.time_mlp = nn.Sequential(
+        self.time_embed = nn.Sequential(
             nn.Linear(d_model, d_model),
             nn.SiLU(),
             nn.Linear(d_model, d_model),
         )
         
-        self.feat_mlp = nn.Sequential(
+        self.feat_embed = nn.Sequential(
             nn.Linear(8, d_model),
+            nn.SiLU(),
+            nn.Linear(d_model, d_model),
+        )
+        
+        self.feat_mlp = nn.Sequential(
+            nn.Linear(1, d_model),
             nn.SiLU(),
             nn.Linear(d_model, d_model),
         )
@@ -117,11 +124,13 @@ class ViTDecoder(nn.Module):
         feat3_flat = feat3.flatten(2).transpose(1, 2)  
 
         t_embed = timestep_embedding(t, self.d_model)
-        t_embed = self.time_mlp(t_embed).unsqueeze(1) # (B, 1, d_model)
+        t_embed = self.time_embed(t_embed).unsqueeze(1) # (B, 1, d_model)
           
-        f_embed = self.feat_mlp(f).unsqueeze(1) # (B, 8) -> (B, 1, d_model)
+        f_embed = self.feat_embed(f).unsqueeze(1) # (B, 8) -> (B, 1, d_model)
 
         tokens = feat3_flat # (B, 12*16, d_model)
+        features = self.feat_mlp(f.unsqueeze(-1).float()) # (B, 8, d_model)
+        tokens = torch.cat([tokens, features], dim=1) # (B, 12*16+8, d_model)
         tokens = tokens + self.pos_embed + t_embed + f_embed
         tokens = self.transformer_encoder(tokens)  
 

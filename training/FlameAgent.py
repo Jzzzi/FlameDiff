@@ -12,7 +12,7 @@ from model.ViTDecoder import ViTDecoder
 from diffusers import DDPMScheduler
 
 class FlameAgent(pl.LightningModule):
-    def __init__(self, endecoder_ckpt: str = None, max_v: float = None, min_v: float = None, sensors: list = None, ckpt_path: str = None):
+    def __init__(self, endecoder_ckpt: str, max_v: float = None, min_v: float = None, sensors: list = None, ckpt_path: str = None):
         '''
         FlameDiffModel, AutoEncoder + ViTDecoder.
         Args:
@@ -118,6 +118,7 @@ class FlameAgent(pl.LightningModule):
         Returns:
             torch.Tensor, (B, 1, 192, 256)
         '''
+        self.eval()
         if torch.cuda.is_available():
             batch = batch.cuda()
             self.cuda()
@@ -129,11 +130,12 @@ class FlameAgent(pl.LightningModule):
         timesteps = self.scheduler.timesteps.squeeze() # (1000, )
         # noisy_img = self.scheduler.add_noise(img, noise, timesteps[:, 0])     
         from tqdm import tqdm
-        for i in tqdm(timesteps):
-            timestep = torch.ones((batch.shape[0], 1)).to(img.device).float() * i.float()
-            pred_noise = self.vitdecoder(noisy_img, feature, timestep.float())
-            res_dict = self.scheduler.step(pred_noise, i.int(), noisy_img)
-            noisy_img = res_dict['prev_sample']
+        with torch.no_grad():
+            for i in tqdm(timesteps):
+                timestep = torch.ones((batch.shape[0], 1)).to(img.device).float() * i.float()
+                pred_noise = self.vitdecoder(noisy_img, feature, timestep.float())
+                res_dict = self.scheduler.step(pred_noise, i.int(), noisy_img)
+                noisy_img = res_dict['prev_sample']
         # reverse the normalization  
         img = self.autoendecoder.decoder(noisy_img)
         if (self.max_v is not None) and (self.min_v is not None):

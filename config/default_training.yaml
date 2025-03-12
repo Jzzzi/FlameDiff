@@ -2,7 +2,7 @@ cache_path: /data15/jinkun.liu.2502/CodeSpace/FlameDiff/dataset
 exp_name: vit
 log_dir: /data15/jinkun.liu.2502/CodeSpace/FlameDiff/exp/${exp_name}/${now:%Y-%m-%d-%H-%M-%S}
 endecoder_ckpt: /data15/jinkun.liu.2502/CodeSpace/FlameDiff/weights/EnDecoder_new.ckpt
-ckpt_path: /data15/jinkun.liu.2502/CodeSpace/FlameDiff/exp/vit/2025-03-08-22-48-29/vit/version_0/checkpoints/flame-epoch=999-val_loss=0.01.ckpt
+ckpt_path: /data15/jinkun.liu.2502/CodeSpace/FlameDiff/exp/vit/2025-03-11-16-47-46/vit/version_0/checkpoints/flame-epoch=1999-val_loss=0.01.ckpt
 seed: 0
 
 sensors: [[20, 95], [70, 95], [110, 80], [110, 110], [160, 75], [160, 120], [200, 75], [200, 120]]
