@@ -89,11 +89,13 @@ class ViTDecoder(nn.Module):
             nn.Linear(d_model, d_model),
         )
         
+        '''
         self.feat_embed = nn.Sequential(
             nn.Linear(8, d_model),
             nn.SiLU(),
             nn.Linear(d_model, d_model),
         )
+        '''
         
         self.feat_mlp = nn.Sequential(
             nn.Linear(1, d_model),
@@ -126,12 +128,13 @@ class ViTDecoder(nn.Module):
         t_embed = timestep_embedding(t, self.d_model)
         t_embed = self.time_embed(t_embed).unsqueeze(1) # (B, 1, d_model)
           
-        f_embed = self.feat_embed(f).unsqueeze(1) # (B, 8) -> (B, 1, d_model)
+        # f_embed = self.feat_embed(f).unsqueeze(1) # (B, 8) -> (B, 1, d_model)
 
         tokens = feat3_flat # (B, 12*16, d_model)
         features = self.feat_mlp(f.unsqueeze(-1).float()) # (B, 8, d_model)
         tokens = torch.cat([tokens, features], dim=1) # (B, 12*16+8, d_model)
-        tokens = tokens + self.pos_embed + t_embed + f_embed
+        # tokens = tokens + self.pos_embed + t_embed + f_embed
+        tokens = tokens + self.pos_embed + t_embed # no feature embedding
         tokens = self.transformer_encoder(tokens)  
 
         tokens = tokens[:, :H * W, :]  

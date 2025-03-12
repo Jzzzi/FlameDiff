@@ -1,5 +1,11 @@
 # FlameDiff: Flame Field based Diffusion Model
 
+As you know, AI can paint:
+
+![AI Paint](./images/gpt_flame.png)
+
+What if we want AI to paint a real turbulant flame field? This make sense!
+
 ![FlameDiff](./images/flame.png)
 
 ## Running the code
